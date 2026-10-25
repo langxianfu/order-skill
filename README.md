@@ -5,7 +5,7 @@
 ## 安装
 
 ```bash
-npx skills add <owner>/ziwoyou-order-skill
+npx skills add langxianfu/order-skill
 ```
 
 ## 能力
