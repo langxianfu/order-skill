@@ -1,0 +1,8 @@
+# 凭据与运行状态, 永不提交
+**/accounts.json
+**/.state/
+**/.env
+
+# 系统/编辑器
+.DS_Store
+node_modules/

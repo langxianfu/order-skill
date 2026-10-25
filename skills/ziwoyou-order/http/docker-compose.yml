@@ -1,0 +1,55 @@
+services:
+  zwy-http:
+    build:
+      # 构建上下文是技能根目录, 以便复制 scripts/zwy.js
+      context: ..
+      dockerfile: http/Dockerfile
+    image: zwy-http:1.1.0
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ZWY_ROOT: /app
+      PORT: 8080
+    volumes:
+      # 账号凭据只在运行时只读挂载, 不进镜像
+      - ../scripts/accounts.json:/app/scripts/accounts.json:ro
+      # 登录 token 缓存与报价单需要可写, 用命名卷持久化
+      - zwy-state:/app/scripts/.state
+    ports:
+      # 默认只听本机回环; 服务器上用 .env 的 ZWY_BIND 指向 docker 网桥地址
+      - "${ZWY_BIND:-127.0.0.1}:18080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  zwy-mcp:
+    image: zwy-http:1.1.0
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ZWY_BASE: http://zwy-http:8080
+      ZWY_MCP_PORT: 8081
+      ZWY_MCP_HOST: 0.0.0.0
+      ZWY_MCP_PATH_PREFIX: /zwy-mcp
+    depends_on:
+      - zwy-http
+    command: ["node", "/app/http/mcp.js"]
+    # MCP 只做转发, 不需要账号文件
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "${ZWY_BIND:-127.0.0.1}:18081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  zwy-state:

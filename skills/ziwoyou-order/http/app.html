@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1420">
+<title>自我游比价</title>
+<style>
+  :root{
+    --bg:#0b1420; --bg2:#121e2c; --card:#16243478; --line:#24374b;
+    --txt:#e8f1fa; --dim:#8fa5bb; --ice:#5fd0ff; --ice2:#2b9fd8;
+    --ok:#38d39f; --warn:#ffb454; --bad:#ff6b6b; --star:#ffd15c;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif}
+  body{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+  .wrap{max-width:640px;margin:0 auto;padding:0 16px}
+  header{position:sticky;top:0;z-index:9;background:linear-gradient(180deg,#0b1420 78%,#0b142000);
+    padding:calc(10px + env(safe-area-inset-top)) 0 8px}
+  .hd{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .hd h1{margin:0;font-size:17px;letter-spacing:.5px}
+  .hd h1 span{color:var(--ice)}
+  .icon-btn{background:#1b2c3e;border:1px solid var(--line);color:var(--dim);
+    border-radius:10px;padding:7px 11px;font-size:13px}
+  .tabs{display:flex;gap:8px;margin:10px 0 4px}
+  .tab{flex:1;text-align:center;padding:9px 0;border-radius:11px;border:1px solid var(--line);
+    background:#111d2a;color:var(--dim);font-size:14px}
+  .tab.on{background:#163548;border-color:#2f6f92;color:var(--ice)}
+  .panel{display:none}
+  .panel.on{display:block}
+  .field{margin:10px 0}
+  .field label{display:block;font-size:12px;color:var(--dim);margin-bottom:5px}
+  input,select,textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px solid var(--line);
+    background:#0f1b27;color:var(--txt);font-size:15px;outline:none}
+  input:focus,select:focus,textarea:focus{border-color:var(--ice2)}
+  textarea{min-height:96px;resize:vertical;line-height:1.55;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif}
+  .seg{display:flex;gap:0;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  .seg button{flex:1;padding:10px 0;background:#0f1b27;border:0;color:var(--dim);font-size:14px}
+  .seg button.on{background:#163548;color:var(--ice)}
+  .btn{width:100%;padding:13px;border-radius:12px;border:0;font-size:15px;font-weight:600;
+    background:linear-gradient(135deg,var(--ice),var(--ice2));color:#04202e}
+  .btn:disabled{opacity:.5}
+  .btn.ghost{background:#1b2c3e;color:var(--txt);border:1px solid var(--line);font-weight:500}
+  .btn.danger{background:linear-gradient(135deg,#ff8a5c,#ff5c5c);color:#2a0b0b}
+  .meta{font-size:12px;color:var(--dim);margin:8px 0 0}
+  .card{margin:14px 0;border:1px solid var(--line);border-radius:16px;background:var(--card);
+    padding:16px;overflow:hidden}
+  .card h3{margin:0 0 10px;font-size:14px;font-weight:600;line-height:1.5;
+    overflow-wrap:anywhere}
+  .opt{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:7px 0;border-top:1px dashed #22344a;font-size:13px}
+  .opt:first-of-type{border-top:0}
+  .opt .a{color:var(--dim);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .opt .p{font-variant-numeric:tabular-nums;font-weight:600}
+  .opt.best .p{color:var(--star)}
+  .tag{font-size:11px;padding:2px 7px;border-radius:999px;background:#1d3a4d;color:var(--ice)}
+  .tag.miss{background:#2a2130;color:#b08a9b}
+  .diff{font-size:11px;color:var(--warn)}
+  .muted{color:var(--dim)}
+  .row{display:flex;gap:8px;align-items:center}
+  .row>*{flex:1}
+  .msg{margin:10px 0;padding:10px 12px;border-radius:11px;font-size:13px;line-height:1.5}
+  .msg.err{background:#3a1c22;border:1px solid #5d2a33;color:#ffb3b3}
+  .msg.ok{background:#14332b;border:1px solid #1f5d4a;color:#a6f0d4}
+  .msg.info{background:#142c3a;border:1px solid #1f4c63;color:#a9dff5}
+  .sheet{position:fixed;inset:0;z-index:30;display:none;align-items:flex-end;
+    background:#02070bcc;backdrop-filter:blur(2px)}
+  .sheet.on{display:flex}
+  .sheet .box{width:100%;max-height:88vh;overflow:auto;background:#101c29;
+    border-top-left-radius:18px;border-top-right-radius:18px;padding:16px 14px
+    calc(16px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+  .sheet h2{margin:0 0 4px;font-size:16px}
+  .kv{display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+    font-size:13px;padding:8px 0;border-bottom:1px dashed #22344a;color:var(--dim)}
+  .kv span{flex:0 0 auto;white-space:nowrap}
+  .kv b{color:var(--txt);font-variant-numeric:tabular-nums;font-weight:600;
+    flex:1 1 auto;text-align:right;min-width:0;overflow-wrap:anywhere}
+  #shPlan{margin-top:12px;border:1px solid var(--line);border-radius:12px;
+    background:#0d1926;padding:10px 14px 14px}
+  #shPlan .kv{padding:8px 0}
+  #shPlan .kv span{padding-right:10px}
+  #shPlan .field{margin:12px 0 10px}
+  #shPlan .btn{margin-top:2px}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid #2a4a5f;
+    border-top-color:var(--ice);border-radius:50%;animation:r .8s linear infinite;vertical-align:-2px}
+  @keyframes r{to{transform:rotate(360deg)}}
+  .login{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;
+    align-items:center;justify-content:center;padding:20px}
+  .login .box{width:100%;max-width:420px}
+  footer{margin-top:22px;text-align:center;font-size:11px;color:#4c6478}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="hd">
+      <h1>自我游<span>比价</span></h1>
+      <button class="icon-btn" id="btnSetting">token</button>
+    </div>
+    <div class="tabs">
+      <button class="tab on" data-tab="best">比价</button>
+      <button class="tab" data-tab="order">查订单</button>
+    </div>
+  </header>
+
+  <!-- 比价 -->
+  <section class="panel on" id="panel-best">
+    <div class="field">
+      <label>大段文本（可直接粘贴聊天原文，自动识别日期/雪场/张数/姓名/手机号）</label>
+      <textarea id="ask" rows="4" maxlength="800" placeholder="例：需要下单一张 云顶 11月11号平日票 梁爽 13601103717&#10;也可整段粘贴群消息，回车换行不会触发查询"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn ghost" id="btnAsk">只查价格</button>
+        <button class="btn" id="btnAskOrder">下单</button>
+      </div>
+    </div>
+    <div class="meta" id="curSel"></div>
+    <button class="btn ghost" id="btnAdv" style="margin-top:8px;font-size:14px">手动调整日期 / 雪场 / 类型 ▾</button>
+    <div id="adv" style="display:none">
+      <div class="field">
+        <label>出行日期</label>
+        <input type="date" id="date">
+      </div>
+      <div class="field">
+        <label>雪场 / 关键词（留空为全部）</label>
+        <input id="keyword" placeholder="如 万龙、云顶">
+      </div>
+      <div class="field">
+        <label>产品类型</label>
+        <div class="seg" id="segTree">
+          <button class="on" data-t="0">门票</button>
+          <button data-t="1">住滑</button>
+          <button data-t="any">全部</button>
+        </div>
+      </div>
+      <button class="btn" id="btnBest">开始比价</button>
+    </div>
+    <div id="bestMsg"></div>
+    <div class="meta" id="bestMeta"></div>
+    <div id="groups"></div>
+  </section>
+
+  <!-- 订单 -->
+  <section class="panel" id="panel-order">
+    <div class="field">
+      <label>姓名 / 手机号 / 订单号 / 票码（可留空）</label>
+      <input id="orderKey" placeholder="如 梁爽、13601103717、1219953828">
+    </div>
+    <div class="field">
+      <label>日期（游玩日期或下单日期，可留空）</label>
+      <input type="date" id="orderDate">
+    </div>
+    <div class="field">
+      <label>账号</label>
+      <select id="orderAcc"></select>
+    </div>
+    <button class="btn" id="btnDetail">查询订单</button>
+    <div id="orderMsg"></div>
+    <div id="orderBox"></div>
+  </section>
+
+  <footer>数据来自自我游分销商接口 · 价格与库存以实时校验为准</footer>
+</div>
+
+<!-- 下单面板 -->
+<div class="sheet" id="sheet">
+  <div class="box">
+    <h2 id="shTitle">下单</h2>
+    <div class="meta" id="shSub"></div>
+    <div class="field">
+      <label>张数 / 单数</label>
+      <input type="number" id="shCount" min="1" max="20" value="1">
+    </div>
+    <div class="field">
+      <label>游客手机号（未配手机号的账号必需）</label>
+      <input id="shPhone" inputmode="tel" placeholder="11 位手机号">
+    </div>
+    <div class="field">
+      <label>游客姓名（留空自动生成）</label>
+      <input id="shName" placeholder="选填">
+    </div>
+    <button class="btn ghost" id="btnPlan">生成报价单（不扣款）</button>
+    <div id="shMsg"></div>
+    <div id="shPlan"></div>
+  </div>
+</div>
+
+<!-- 登录 -->
+<div class="login" id="login">
+  <div class="box">
+    <h1 style="font-size:20px;margin:0 0 6px">自我游<span style="color:var(--ice)">比价</span></h1>
+    <p class="meta" style="margin-bottom:12px">粘贴服务器上的 API token，仅保存在本机浏览器。</p>
+    <div class="field">
+      <label>API Token</label>
+      <input id="tkInput" type="password" placeholder="64 位 token" autocomplete="off">
+    </div>
+    <button class="btn" id="btnLogin">进入</button>
+    <div id="loginMsg"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var API = '/zwy';
+  var LS_TOKEN = 'zwy_token', LS_PHONE = 'zwy_phone', LS_NAME = 'zwy_name';
+  var state = { groups: [], date: '', keyword: '', tree: '0', plan: null, busy: false,
+    intent: null, rawGroups: [], filterNote: '', showAll: false, pickAlts: [] };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function money(n) {
+    var v = Number(n);
+    return isFinite(v) ? '¥' + v.toFixed(2).replace(/\.00$/, '') : '—';
+  }
+  function token() { return localStorage.getItem(LS_TOKEN) || ''; }
+
+  function setMsg(el, kind, text) {
+    el.innerHTML = text ? '<div class="msg ' + kind + '">' + esc(text) + '</div>' : '';
+  }
+
+  function api(path, opts) {
+    opts = opts || {};
+    var headers = { 'content-type': 'application/json' };
+    if (token()) headers.authorization = 'Bearer ' + token();
+    return fetch(API + path, {
+      method: opts.method || 'GET',
+      headers: headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      signal: opts.signal
+    }).then(function (res) {
+      return res.text().then(function (t) {
+        var data;
+        try { data = JSON.parse(t); } catch (e) { data = { ok: false, error: '返回不是 JSON: ' + t.slice(0, 120) }; }
+        if (res.status === 401) { logout(); throw new Error('token 失效，请重新填写'); }
+        if (!res.ok || data.ok === false) throw new Error(data.error || ('HTTP ' + res.status));
+        return data;
+      });
+    });
+  }
+
+  function logout() {
+    localStorage.removeItem(LS_TOKEN);
+    $('login').style.display = 'flex';
+    $('tkInput').value = '';
+  }
+
+  function login() {
+    var v = $('tkInput').value.trim();
+    if (v.length < 16) { setMsg($('loginMsg'), 'err', 'token 长度不对，至少 16 位'); return; }
+    localStorage.setItem(LS_TOKEN, v);
+    setMsg($('loginMsg'), 'info', '校验中…');
+    api('/accounts').then(function (d) {
+      $('login').style.display = 'none';
+      setMsg($('loginMsg'), 'ok', '');
+      fillAccounts(d.accounts || []);
+      // 登录后立即查一次默认日期, 避免打开页面看到空白误以为没数据
+      setMsg($('bestMsg'), 'info', '已连接 ' + (d.accounts || []).length + ' 个账号，正在查询…');
+      doBest();
+    }).catch(function (e) {
+      localStorage.removeItem(LS_TOKEN);
+      setMsg($('loginMsg'), 'err', e.message);
+    });
+  }
+
+  function fillAccounts(list) {
+    var sel = $('orderAcc');
+    sel.innerHTML = '<option value="">全部账号</option>' + list.map(function (a) {
+      return '<option value="' + esc(a) + '">' + esc(a) + '</option>';
+    }).join('');
+  }
+
+  function defaultDate() {
+    var d = new Date();
+    d.setDate(d.getDate() + 1);
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+
+  // ---------- 比价 ----------
+  // 一句话里的酒店/房型/套餐条件同样作用到「只查价格」列表, 否则列表按价格升序会把「单房」排在最前,
+  // 与「下单」时模型选中的产品相差上千元
+  function intentTokens(it) {
+    if (!it) return [];
+    var toks = [];
+    if (it.hotel) toks.push(it.hotel);
+    String(it.room || '').split(/\s+/).forEach(function (t) { if (t) toks.push(t); });
+    if (it.pkgType) toks.push(it.pkgType);
+    return toks;
+  }
+
+  function filterByIntent(list, it) {
+    if (!it) return { list: list, note: '' };
+    var hotel = it.hotel || '';
+    var pkg = it.pkgType || '';
+    var rooms = String(it.room || '').split(/\s+/).filter(Boolean);
+    if (!hotel && !pkg && !rooms.length) return { list: list, note: '' };
+    // 硬条件: 指定酒店与套餐形态必须命中; 套餐需求下排除纯房源(单房)
+    var base = list.filter(function (g) {
+      var t = g.title || '';
+      if (pkg && /\[单房\]|单房&/.test(t)) return false;
+      if (pkg && t.indexOf(pkg) < 0) return false;
+      if (hotel && t.indexOf(hotel) < 0) return false;
+      return true;
+    });
+    if (!base.length) base = list;
+    // 软条件: 房型词按命中个数打分, 同分按价格升序
+    var scored = base.map(function (g) {
+      var t = g.title || '';
+      var hits = rooms.filter(function (k) { return t.indexOf(k) >= 0; }).length;
+      return { g: g, s: hits + (pkg && t.indexOf(pkg) >= 0 ? 1 : 0) };
+    }).sort(function (a, b) { return (b.s - a.s) || (Number(a.g.lowest.price) - Number(b.g.lowest.price)); });
+    var top = scored.length ? scored[0].s : 0;
+    var out = scored.filter(function (x) { return x.s === top; }).map(function (x) { return x.g; }).slice(0, 8);
+    if (!out.length || out.length === list.length) return { list: list, note: '' };
+    var label = [hotel, rooms.join(' '), pkg].filter(Boolean).join(' · ');
+    return { list: out, note: '已按「' + label + '」过滤：' + list.length + ' 组 → ' + out.length + ' 组' };
+  }
+
+  function renderGroups(data) {
+    var host = $('groups');
+    // 「清账专用」是供应商账务占位产品, 不参与比价展示
+    var raw = (data.groups || []).filter(function (g) { return !/清账专用/.test(g.title || ''); });
+    state.rawGroups = raw;
+    state.rawKeyword = data.keyword || state.keyword || '';
+    var picked;
+    if (state.showAll) {
+      picked = { list: raw, note: '' };
+    } else if (state.modelPick) {
+      // 查询价格也走模型选品: 只展示模型选中的产品与其备选
+      var mp = state.modelPick;
+      var ids = [mp.pick.infoId].concat((mp.alternatives || []).map(function (a) { return a.infoId; }));
+      var sub = raw.filter(function (g) {
+        if (ids.indexOf(String(g.lowest.infoId)) >= 0) return true;
+        return (g.options || []).some(function (o) { return ids.indexOf(String(o.infoId)) >= 0; });
+      });
+      picked = sub.length
+        ? { list: sub, note: '模型选中「' + mp.pick.title + '」' + money(mp.pick.price) + (mp.confidence < 0.7 ? ' · 置信度 ' + Math.round(mp.confidence * 100) + '%' : '') }
+        : filterByIntent(raw, state.intent);
+    } else {
+      picked = filterByIntent(raw, state.intent);
+    }
+    var list = picked.list;
+    state.filterNote = picked.note;
+    data.groups = list;
+    state.groups = list;
+    if (!list.length) {
+      var kw = (data.keyword || state.keyword || '').trim();
+      host.innerHTML = '<div class="msg info">' + (kw
+        ? '没有匹配「' + esc(kw) + '」的产品，试试只填雪场名（如 万龙、云顶），或把产品类型切到「全部」。'
+        : '当天没有可售产品，换个日期或把产品类型切到「全部」再试。') + '</div>';
+      return;
+    }
+    host.innerHTML = list.map(function (g, gi) {
+      var opts = (g.options || []).map(function (o) {
+        var best = o.infoId === g.lowest.infoId && o.alias === g.lowest.alias;
+        return '<div class="opt' + (best ? ' best' : '') + '">' +
+          '<span class="a">' + (best ? '★ ' : '') + esc(o.alias) +
+            ' <span class="tag">库存 ' + esc(o.maxNum) + '</span></span>' +
+          '<span class="p">' + money(o.price) +
+            (o.diff > 0 ? ' <span class="diff">+' + o.diff + '</span>' : '') + '</span>' +
+        '</div>';
+      }).join('');
+      var miss = (g.missing || []).length
+        ? '<div class="opt"><span class="a">' + (g.missing || []).map(function (m) {
+            return '<span class="tag miss">' + esc(m) + ' 无此产品</span>';
+          }).join(' ') + '</span><span></span></div>' : '';
+      return '<div class="card">' +
+        '<h3>' + esc(g.title) + '</h3>' + opts + miss +
+        '<div style="margin-top:10px"><button class="btn" data-gi="' + gi + '">用 ' + money(g.lowest.price) + ' 下单</button></div>' +
+      '</div>';
+    }).join('');
+    Array.prototype.forEach.call(host.querySelectorAll('button[data-gi]'), function (b) {
+      b.addEventListener('click', function () { openSheet(Number(b.getAttribute('data-gi'))); });
+    });
+  }
+
+  function paintMeta(d) {
+    var extra = state.filterNote
+      ? ' · ' + state.filterNote + ' <button class="icon-btn" id="btnAll" style="padding:3px 8px;font-size:11px">显示全部</button>'
+      : '';
+    $('bestMeta').innerHTML = '可售 ' + d.sellableCount + ' 个产品 · 归并 ' + state.groups.length + ' 组 · 账号 ' +
+      esc((d.accounts || []).join(' / ')) + extra;
+    var ba = $('btnAll');
+    if (ba) ba.addEventListener('click', function () {
+      state.showAll = true;
+      renderGroups({ groups: state.rawGroups, keyword: state.rawKeyword });
+      paintMeta(d);
+    });
+  }
+
+  var aborter = null;
+  function doBest() {
+    var date = $('date').value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { setMsg($('bestMsg'), 'err', '请选择日期'); return; }
+    var kw = $('keyword').value.trim();
+    state.date = date; state.keyword = kw;
+    setMsg($('bestMsg'), 'info', '正在扫描全部账号，约需 5-40 秒…');
+    $('bestMeta').textContent = '';
+    $('groups').innerHTML = '';
+    $('btnBest').disabled = true;
+    if (aborter) aborter.abort();
+    aborter = new AbortController();
+    var q = '/best?date=' + encodeURIComponent(date) + '&tree=' + encodeURIComponent(state.tree) +
+      (kw ? '&keyword=' + encodeURIComponent(kw) : '');
+    return api(q, { signal: aborter.signal }).then(function (d) {
+      setMsg($('bestMsg'), d.cached ? 'info' : 'ok', d.cached ? '命中缓存（5 分钟内）' : '比价完成');
+      state.best = d;
+      renderGroups(d);
+      paintMeta(d);
+      return d;
+    }).catch(function (e) {
+      if (e.name === 'AbortError') return null;
+      setMsg($('bestMsg'), 'err', e.message);
+      return null;
+    }).then(function (d) {
+      $('btnBest').disabled = false;
+      return d;
+    });
+  }
+
+  // ---------- 下单 ----------
+  function openSheet(gi) {
+    var g = state.groups[gi];
+    if (!g) return;
+    state.plan = null;
+    state.ask = null;
+    state.sheetDate = state.date;
+    state.sheetNights = '';
+    $('shTitle').textContent = g.title;
+    $('shSub').innerHTML = '最低 ' + money(g.lowest.price) + ' · ' + esc(g.lowest.alias) +
+      ' · 库存 ' + esc(g.lowest.maxNum) + ' · infoId ' + esc(g.lowest.infoId) +
+      '<br>出行日期 ' + esc(state.date || '—');
+    $('shCount').value = 1;
+    $('shPhone').value = localStorage.getItem(LS_PHONE) || '';
+    // 姓名沿用上一句话/上一次下单填过的, 避免从比价结果点「下单」时被清空
+    $('shName').value = localStorage.getItem(LS_NAME) || (state.askName || '');
+    $('shPlan').innerHTML = '';
+    setMsg($('shMsg'), '', '');
+    $('sheet').classList.add('on');
+    $('sheet').setAttribute('data-gi', String(gi));
+  }
+
+  function closeSheet() { $('sheet').classList.remove('on'); }
+
+  function makePlan() {
+    var count = parseInt($('shCount').value, 10);
+    if (!(count >= 1)) { setMsg($('shMsg'), 'err', '张数至少 1'); return; }
+    var body;
+    if (state.ask) {
+      // 一句话下单: 选品模式按模型选中的 infoId; 关键词模式让服务端挑当天该雪场最低价（此步不扣款）
+      body = { date: state.date, count: count, tree: state.tree };
+      if (state.ask.infoId) body.infoId = state.ask.infoId;
+      else { body.keyword = state.ask.keyword; if (state.ask.pkey) body.pkey = state.ask.pkey; }
+    } else {
+      var gi = Number($('sheet').getAttribute('data-gi'));
+      var g = state.groups[gi];
+      if (!g) { setMsg($('shMsg'), 'err', '请先从比价结果里选择产品'); return; }
+      body = { date: state.date, count: count, infoId: g.lowest.infoId, tree: state.tree };
+    }
+    var phone = $('shPhone').value.trim();
+    if (phone && !/^1\d{10}$/.test(phone)) { setMsg($('shMsg'), 'err', '手机号格式不对'); return; }
+    if (phone) localStorage.setItem(LS_PHONE, phone);
+    var guestName = $('shName').value.trim();
+    if (guestName) localStorage.setItem(LS_NAME, guestName);
+    state.askName = guestName;
+    setMsg($('shMsg'), 'info', '生成报价单中…');
+    $('btnPlan').disabled = true;
+    api('/order/plan', { method: 'POST', body: body })
+      .then(function (d) {
+        state.plan = d;
+        var worst = d.worst;
+        var nights = (state.intent && Number(state.intent.nights)) ? Number(state.intent.nights) : 0;
+        var stayLine = nights
+          ? esc(d.date) + ' 入住 · ' + nights + ' 晚' + (state.intent.checkout ? ' · ' + esc(state.intent.checkout) + ' 离店' : '')
+          : esc(d.date);
+        var now = new Date();
+        var stamp = now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()) +
+          ' ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+        $('shPlan').innerHTML =
+          '<div class="kv"><span>产品</span><b>' + esc(d.groupTitle) + '</b></div>' +
+          '<div class="kv"><span>' + (nights ? '入住日期' : '出行日期') + '</span><b>' + stayLine + '</b></div>' +
+          '<div class="kv"><span>游客</span><b>' + esc(guestName || '（自动生成）') + (phone ? ' · ' + esc(phone) : '') + '</b></div>' +
+          '<div class="kv"><span>数量</span><b>' + d.count + ' 单</b></div>' +
+          '<div class="kv"><span>候选账号</span><b>' + (d.candidates || []).map(function (c) { return esc(c.alias) + ' ' + money(c.price); }).join(' · ') + '</b></div>' +
+          '<div class="kv"><span>最坏总价</span><b>' + money(worst) + '</b></div>' +
+          '<div class="kv"><span>报价单生成于</span><b>' + stamp + '（30 分钟内有效）</b></div>' +
+          '<div class="field"><label>本次金额上限（必须 ≥ 最坏总价）</label>' +
+          '<input type="number" id="shMax" step="0.01" value="' + worst + '"></div>' +
+          '<button class="btn danger" id="btnExec">确认扣款 ' + money(worst) + '</button>';
+        setMsg($('shMsg'), 'ok', '请核对产品、入住日期和游客姓名，确认无误后再点下面的扣款按钮。');
+        $('btnExec').addEventListener('click', executePlan);
+      })
+      .catch(function (e) { setMsg($('shMsg'), 'err', e.message); })
+      .then(function () { $('btnPlan').disabled = false; });
+  }
+
+  function executePlan() {
+    var p = state.plan;
+    if (!p) return;
+    var max = Number($('shMax').value);
+    if (!(max > 0)) { setMsg($('shMsg'), 'err', '金额上限必须大于 0'); return; }
+    if (max + 0.001 < p.worst) { setMsg($('shMsg'), 'err', '上限低于最坏总价 ' + money(p.worst) + '，无法执行'); return; }
+    var planFile = String(p.planPath).split('/').pop();
+    setMsg($('shMsg'), 'info', '执行中，请勿关闭页面…');
+    var btn = $('btnExec');
+    btn.disabled = true;
+    api('/order/execute', { method: 'POST', body: {
+      plan: planFile, date: p.date, count: p.count, maxMoney: max,
+      confirm: 'CONFIRM', phone: $('shPhone').value.trim() || undefined,
+      name: $('shName').value.trim() || undefined
+    } }).then(function (d) {
+      var items = (d.results || []).map(function (r) {
+        return '<div class="kv"><span>' + esc(r.name || '') + '</span><b>' +
+          (r.ok ? (r.orderId ? '订单 ' + esc(r.orderId) : '成功') : '失败') + '</b></div>';
+      }).join('');
+      $('shPlan').innerHTML = items + '<div class="kv"><span>合计</span><b>' + money(d.total) + '</b></div>';
+      var blocked = Object.keys(d.blocked || {});
+      if (blocked.length) $('shPlan').innerHTML += '<div class="meta">跳过的账号：' + blocked.map(function (k) {
+        return esc(k) + '（' + esc(d.blocked[k]) + '）'; }).join('、') + '</div>';
+      setMsg($('shMsg'), d.ok ? 'ok' : 'err', d.ok ? '全部下单成功' : '部分或全部失败，明细见上');
+    }).catch(function (e) {
+      setMsg($('shMsg'), 'err', e.message);
+      btn.disabled = false;
+    });
+  }
+
+  // ---------- 订单 ----------
+  function renderOrders(list) {
+    // 只按日期查可能上百笔, 手机端渲染不动, 超出部分提示缩小范围
+    var CAP = 30;
+    var shown = list.slice(0, CAP);
+    $('orderBox').innerHTML = shown.map(function (o) {
+      return '<div class="card">' +
+        '<h3>' + esc(o.prodDetail || '订单 ' + o.orderId) + '</h3>' +
+        '<div class="kv"><span>订单号</span><b>' + esc(o.orderId) + '</b></div>' +
+        '<div class="kv"><span>状态</span><b>' + esc(o.stateDesc) + '</b></div>' +
+        '<div class="kv"><span>游玩 / 下单</span><b>' + esc(o.travelDate || '-') + ' / ' + esc(o.orderDate || '-') + '</b></div>' +
+        '<div class="kv"><span>游客</span><b>' + esc(o.name) + ' ' + esc(o.phone) + '</b></div>' +
+        '<div class="kv"><span>金额 / 张数</span><b>' + money(o.money) + ' / ' + esc(String(o.num || 1)) + '</b></div>' +
+        '<div class="kv"><span>账号</span><b>' + esc(o.account) + '</b></div>' +
+        '<div class="kv"><span>票码</span><b>' + esc(o.code || '待出票') + '</b></div>' +
+        '</div>';
+    }).join('') + (list.length > CAP
+      ? '<div class="msg info">共 ' + list.length + ' 笔，仅显示最近 ' + CAP + ' 笔；加姓名或手机号可缩小范围。</div>'
+      : '');
+  }
+
+  function doDetail() {
+    var key = $('orderKey').value.trim();
+    var date = $('orderDate').value;
+    var acc = $('orderAcc').value;
+    if (!key && !date) { setMsg($('orderMsg'), 'err', '填姓名/手机号/订单号，或选一个日期'); return; }
+    var q = '/order/search?key=' + encodeURIComponent(key) + '&date=' + encodeURIComponent(date) +
+      (acc ? '&account=' + encodeURIComponent(acc) : '');
+    $('btnDetail').disabled = true;
+    setMsg($('orderMsg'), 'info', '查询中…');
+    $('orderBox').innerHTML = '';
+    api(q).then(function (d) {
+      var list = d.orders || [];
+      var bad = Object.keys(d.scanned || {}).filter(function (k) { return d.scanned[k].error; });
+      if (!list.length) {
+        if (bad.length) {
+          setMsg($('orderMsg'), 'err', '账号查询失败：' + bad.map(function (k) {
+            return k + '（' + d.scanned[k].error + '）'; }).join('、'));
+        } else {
+          setMsg($('orderMsg'), 'info', '没有匹配的订单');
+        }
+        return;
+      }
+      setMsg($('orderMsg'), 'ok', '共 ' + list.length + ' 笔' + (bad.length ? '，' + bad.length + ' 个账号查询失败' : ''));
+      renderOrders(list);
+    }).catch(function (e) {
+      setMsg($('orderMsg'), 'err', e.message);
+    }).then(function () { $('btnDetail').disabled = false; });
+  }
+
+  // ---------- 一句话查询 ----------
+  // 例: "万龙 12月19号 一天多少钱" / "云顶11.11雪票" / "2027-02-16 富龙 住滑"
+  var RESORTS = ['万龙', '云顶', '富龙', '翠云山', '雪如意', '金山岭', '太舞', '密苑', '银河', '多乐美地', '长城岭', '崇礼', '北大湖', '松花湖', '亚布力'];
+  var ASK_NOISE = /雪票|门票|价格|多少钱|一天|两天|三天|日场|夜场|预售|套餐|次卡|季卡|滑雪|的|吗|呢|号|日/g;
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function localToday() {
+    var t = new Date();
+    return t.getFullYear() + '-' + pad2(t.getMonth() + 1) + '-' + pad2(t.getDate());
+  }
+
+  function parseAsk(text) {
+    var s = String(text || '').replace(/[０-９]/g, function (c) {
+      return String.fromCharCode(c.charCodeAt(0) - 0xfee0);
+    });
+    var out = { date: '', keyword: '', tree: 0 };
+    var y = 0, mo = 0, d = 0;
+    var m = s.match(/(20\d{2})\s*[-\/年.]\s*(\d{1,2})\s*[-\/月.]\s*(\d{1,2})/);
+    if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+    if (!y) {
+      m = s.match(/(\d{1,2})\s*[月.\/-]\s*(\d{1,2})/);
+      if (m) { mo = +m[1]; d = +m[2]; }
+    }
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+      var year = y || new Date().getFullYear();
+      var ds = year + '-' + pad2(mo) + '-' + pad2(d);
+      // 没写年份时按雪季往后推: 已过去的日期算下一年
+      if (!y && ds < localToday()) ds = (year + 1) + '-' + pad2(mo) + '-' + pad2(d);
+      out.date = ds;
+    }
+    if (/住滑|酒店|住宿|公寓|单房/.test(s)) out.tree = 1;
+    out.pkey = /夜场/.test(s) ? '夜场' : (/全天|日场|白天/.test(s) ? '日场' : '');
+    out.keyword = RESORTS.filter(function (r) { return s.indexOf(r) >= 0; })[0] || '';
+    if (!out.keyword) {
+      var tokens = s.replace(ASK_NOISE, ' ')
+        .replace(/[\d.．\/\\\-_年月~～至到]/g, ' ')
+        .split(/[\s,，、;；:：()（）【】\[\]]+/)
+        .filter(function (t) { return t.length >= 2; });
+      out.keyword = tokens[0] || '';
+    }
+    return out;
+  }
+
+  var TREE_LABEL = { '0': '门票', '1': '住滑', 'any': '全部' };
+  function syncCurSel() {
+    var parts = [];
+    if ($('date').value) parts.push($('date').value);
+    if ($('keyword').value.trim()) parts.push($('keyword').value.trim());
+    parts.push(TREE_LABEL[state.tree] || '门票');
+    $('curSel').textContent = '当前条件：' + parts.join(' · ');
+  }
+
+  function openAdv() {
+    if ($('adv').style.display === 'none') {
+      $('adv').style.display = 'block';
+      $('btnAdv').textContent = '收起手动调整 ▴';
+    }
+    syncCurSel();
+  }
+
+  function applyTree(t) {
+    Array.prototype.forEach.call($('segTree').querySelectorAll('button'), function (b) {
+      var on = b.getAttribute('data-t') === t;
+      b.classList.toggle('on', on);
+      if (on) state.tree = t;
+    });
+    syncCurSel();
+  }
+
+  // ---------- 模型解析优先, 本地规则兜底 ----------
+  // 服务端 /parse 只返回参数, 不下单; 失败或没配 key 时用 parseOrder 的结果
+  var askSeq = 0;
+  function setAsking(on) {
+    $('btnAsk').disabled = on;
+    $('btnAskOrder').disabled = on;
+  }
+
+  function mergeParsed(text, m) {
+    var o = parseOrder(text);
+    if (!m) return o;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(m.date || '')) o.date = m.date;
+    // 模型可能给出"密苑云顶"这类写法, 归一成本地白名单里命中的那个
+    var rs = String(m.resort || '');
+    var hit = rs ? RESORTS.filter(function (r) { return rs.indexOf(r) >= 0; })[0] : '';
+    if (hit) o.keyword = hit;
+    if (m.tree === 0 || m.tree === 1) o.tree = m.tree;
+    if (m.session === '日场' || m.session === '夜场') o.pkey = m.session;
+    var c = parseInt(m.count, 10);
+    if (c >= 1) o.count = Math.min(20, c);
+    if (/^[\u4e00-\u9fa5·]{2,20}$/.test(m.name || '')) o.name = m.name;
+    if (/^1[3-9]\d{9}$/.test(m.phone || '')) o.phone = m.phone;
+    o.intent = m;   // 原始抽取结果, 交给 /pick 在真实候选里做选择题
+    return o;
+  }
+
+  function resolveText(text, cb) {
+    var local = mergeParsed(text, null);
+    var seq = ++askSeq;
+    if (!token()) { cb(local, 'rules'); return; }
+    api('/parse', { method: 'POST', body: { text: text } }).then(function (d) {
+      if (seq !== askSeq) return;
+      cb(mergeParsed(text, d.parsed), 'model');
+    }, function () {
+      if (seq !== askSeq) return;
+      cb(local, 'rules');
+    });
+  }
+
+  function doAsk() {
+    var text = $('ask').value.trim();
+    if (!text) { setMsg($('bestMsg'), 'err', '先输入或粘贴文字'); return; }
+    setAsking(true);
+    setMsg($('bestMsg'), 'info', '解析中…');
+    resolveText(text, function (o, src) {
+      setAsking(false);
+      if (!o.date) { setMsg($('bestMsg'), 'err', '没识别出日期，已展开「手动调整」，请直接选日期'); openAdv(); return; }
+      $('date').value = o.date;
+      $('keyword').value = o.keyword;
+      applyTree(String(o.tree));
+      state.intent = intentTokens(o.intent).length ? o.intent : null;
+      state.showAll = false;
+      state.modelPick = null;
+      var it = o.intent || {};
+      var needPick = o.tree === 1 || !!(it.hotel || it.room || it.pkgType);
+      if (!needPick) {
+        setMsg($('bestMsg'), 'info', '解析完成（' + (src === 'model' ? '模型' : '本地规则') + '）');
+        doBest();
+        return;
+      }
+      // 查价格与下单统一口径: 先拉当天全部候选, 再让模型在真实标题里选品, 列表只展示选中项与备选
+      setMsg($('bestMsg'), 'info', '选品中：先拉取当天全部可售产品…');
+      setAsking(true);
+      doBest().then(function (d) {
+        if (!d) { setAsking(false); return; }
+        setMsg($('bestMsg'), 'info', '正在比对产品标题并选品…');
+        return api('/pick', {
+          method: 'POST',
+          body: { date: o.date, tree: o.tree, intent: o.intent }
+        }).then(function (p) {
+          setAsking(false);
+          if (p.unmatched) {
+            setMsg($('bestMsg'), 'err', '池子里没有完全符合的产品（' + (p.reason || '') + '），已显示全部候选');
+            state.showAll = true;
+          } else {
+            state.modelPick = p;
+            setMsg($('bestMsg'), 'ok', '模型选品完成（' + (src === 'model' ? '模型' : '本地规则') + '解析）');
+          }
+          renderGroups({ groups: state.rawGroups, keyword: state.rawKeyword });
+          paintMeta(d);
+        }, function (e) {
+          setAsking(false);
+          setMsg($('bestMsg'), 'err', '选品失败：' + e.message + '；已退回关键词过滤');
+        });
+      });
+    });
+  }
+
+  // ---------- 一句话下单: 只做解析与预填, 生成报价单和扣款仍需在面板里逐次确认 ----------
+  // 注意: 不能把「张」单独当噪声删掉, 否则姓张的游客名会被吃光（张数已单列）
+  var ORDER_NOISE = /需要|帮我|请|给我|下单|购买|预订|预定|订票|我要|买|雪票|门票|平日|周末|节假日|假日|当天|全天|日场|夜场|上午|下午|张数|号|的|日|票|场/g;
+  var CN_NUM = { '一': 1, '二': 2, '两': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10 };
+
+  function parseOrder(text) {
+    var s = String(text || '').replace(/[０-９]/g, function (c) {
+      return String.fromCharCode(c.charCodeAt(0) - 0xfee0);
+    });
+    var base = parseAsk(s);
+    var out = { date: base.date, keyword: '', tree: base.tree, count: 1, name: '', phone: '', pkey: base.pkey || '' };
+    // 下单必须能定位雪场, 不能只凭"最便宜"去选产品
+    out.keyword = RESORTS.filter(function (r) { return s.indexOf(r) >= 0; })[0] || '';
+    var pm = s.match(/1[3-9]\d{9}/);
+    if (pm) out.phone = pm[0];
+    var cm = s.match(/(\d{1,2}|[一二两三四五六七八九十])\s*张/);
+    if (cm) out.count = CN_NUM[cm[1]] || parseInt(cm[1], 10) || 1;
+    if (out.count > 20) out.count = 20;
+    // 姓名: 去掉手机号/日期/张数/雪场/下单用语后剩下的 2-4 字中文词
+    var rest = s.replace(/1[3-9]\d{9}/g, ' ')
+      .replace(/(20\d{2})\s*[-\/年.]\s*\d{1,2}\s*[-\/月.]\s*\d{1,2}/g, ' ')
+      .replace(/\d{1,2}\s*[月.\/-]\s*\d{1,2}/g, ' ')
+      .replace(/(\d{1,2}|[一二两三四五六七八九十])\s*张/g, ' ')
+      .replace(ORDER_NOISE, ' ')
+      .replace(/[A-Za-z0-9]/g, ' ');
+    RESORTS.forEach(function (r) { rest = rest.split(r).join(' '); });
+    out.name = rest.split(/[\s,，、。;；:：()（）【】\[\]]+/).filter(function (t) {
+      return /^[\u4e00-\u9fa5]{2,4}$/.test(t);
+    })[0] || '';
+    return out;
+  }
+
+  function doAskOrder() {
+    var text = $('ask').value.trim();
+    if (!text) { setMsg($('bestMsg'), 'err', '先输入或粘贴文字'); return; }
+    setAsking(true);
+    setMsg($('bestMsg'), 'info', '解析中…');
+    resolveText(text, function (o, src) {
+      setAsking(false);
+      if (!o.keyword) { setMsg($('bestMsg'), 'err', '没识别出雪场名（支持 ' + RESORTS.join(' / ') + '）'); openAdv(); return; }
+      if (!o.date) { setMsg($('bestMsg'), 'err', '没识别出日期，已展开「手动调整」，请直接选日期'); openAdv(); return; }
+      if (!o.phone) { setMsg($('bestMsg'), 'err', '没识别出 11 位手机号，下单必须有游客手机号'); return; }
+      var it = o.intent || {};
+      var needPick = o.tree === 1 || !!(it.hotel || it.room || it.pkgType);
+      if (!needPick) return openAskSheet(o, src);
+      setMsg($('bestMsg'), 'info', '选品中：先拉取当天全部可售产品…');
+      setAsking(true);
+      var warm = '/best?date=' + encodeURIComponent(o.date) + '&tree=' + encodeURIComponent(o.tree) +
+        (o.keyword ? '&keyword=' + encodeURIComponent(o.keyword) : '');
+      api(warm).then(function () {
+        setMsg($('bestMsg'), 'info', '正在比对产品标题并选品…');
+        return api('/pick', {
+          method: 'POST',
+          body: { date: o.date, tree: o.tree, intent: o.intent || { resort: o.keyword, date: o.date, tree: o.tree } }
+        });
+      }).then(function (d) {
+        setAsking(false);
+        if (d.unmatched) {
+          setMsg($('bestMsg'), 'err', '池子里没有完全符合的产品（' + (d.reason || '') + '），已回退到关键词模式，请在面板里核对');
+          return openAskSheet(o, src);
+        }
+        setMsg($('bestMsg'), '', '');
+        openPickSheet(o, src, d);
+      }, function (e) {
+        setAsking(false);
+        setMsg($('bestMsg'), 'err', '选品失败：' + e.message + '；已回退到关键词模式');
+        openAskSheet(o, src);
+      });
+    });
+  }
+
+  // 关键词模式: 按雪场让服务端挑当天最低价
+  function openAskSheet(o, src) {
+    state.date = o.date;
+    state.keyword = o.keyword;
+    state.ask = { keyword: o.keyword, pkey: o.pkey };
+    $('date').value = o.date;
+    $('keyword').value = o.keyword;
+    applyTree(String(o.tree));
+    state.plan = null;
+    $('shTitle').textContent = '一句话下单 · ' + o.keyword;
+    var stay = o.intent && Number(o.intent.nights)
+      ? ' · 入住 ' + esc(o.date) + ' · ' + o.intent.nights + ' 晚' + (o.intent.checkout ? '（' + esc(o.intent.checkout) + ' 离店）' : '')
+      : '';
+    $('shSub').innerHTML = esc(o.date) + ' · ' + o.count + ' 张 · ' + (o.tree === 1 ? '住滑' : '门票') +
+      (o.pkey ? ' · ' + esc(o.pkey) : '') + stay +
+      '<br>游客 ' + esc(o.name || '（自动生成）') + ' · ' + esc(o.phone) +
+      '<br><span class="muted">参数来源：' + (src === 'model' ? '模型' : '本地规则') + '</span>' +
+      '<br><span style="color:#ffb454">核对无误后，先点「生成报价单」（不扣款），再点「确认扣款」。</span>';
+    $('shCount').value = o.count;
+    $('shPhone').value = o.phone;
+    $('shName').value = o.name;
+    localStorage.setItem(LS_PHONE, o.phone);
+    if (o.name) localStorage.setItem(LS_NAME, o.name);
+    state.askName = o.name || '';
+    $('shPlan').innerHTML = '';
+    setMsg($('shMsg'), '', '');
+    $('sheet').setAttribute('data-gi', '');
+    $('sheet').classList.add('on');
+  }
+
+  // 选品模式: 模型在当天真实候选里挑中一项, 再按 infoId 生成报价单
+  function openPickSheet(o, src, d) {
+    state.date = o.date;
+    state.keyword = o.keyword;
+    state.ask = { keyword: o.keyword, pkey: o.pkey, infoId: d.pick.infoId };
+    state.pickAlts = d.alternatives || [];
+    $('date').value = o.date;
+    $('keyword').value = o.keyword;
+    applyTree(String(o.tree));
+    state.plan = null;
+    $('shTitle').textContent = '模型选品 · ' + o.keyword;
+    var conf = Math.round((d.confidence || 0) * 100);
+    var warn = conf < 70
+      ? '<br><span style="color:#ffb454">置信度偏低（' + conf + '%）：' + esc(d.reason || '需求可能有歧义') + '，务必核对产品名</span>'
+      : '<br><span class="muted">选中理由：' + esc(d.reason || '—') + '（置信度 ' + conf + '%）</span>';
+    function sub() {
+      var a = state.ask;
+      return '<div class="kv"><span>选中产品</span><b>' + esc(a.title || '') + '</b></div>' +
+        '<div class="kv"><span>结算价 / 门市价</span><b>' + money(a.price) + ' / ' + money(a.salePrice) + '</b></div>' +
+        '<div class="kv"><span>账号 · infoId</span><b>' + esc(a.alias || '') + ' · ' + esc(a.infoId) + '</b></div>' +
+        '<div class="kv"><span>日期 · 数量</span><b>' + esc(o.date) + ' · ' + o.count + ' 份</b></div>' +
+        (o.intent && Number(o.intent.nights)
+          ? '<div class="kv"><span>入住 / 离店</span><b>' + esc(o.date) + ' → ' + esc(o.intent.checkout || '—') +
+            ' · ' + o.intent.nights + ' 晚</b></div>'
+          : '') +
+        warn +
+        (state.pickAlts.length ? '<div class="meta" style="margin-top:8px">备选：' +
+          state.pickAlts.map(function (x, i) {
+            return '<button class="icon-btn" data-alt="' + i + '" style="margin:4px 6px 0 0">' + money(x.price) + ' ' + esc(x.title.slice(0, 16)) + '</button>';
+          }).join('') + '</div>' : '') +
+        '<div class="meta">游客 ' + esc(o.name || '（自动生成）') + ' · ' + esc(o.phone) +
+        ' · 参数来源：' + (src === 'model' ? '模型' : '本地规则') + '</div>' +
+        '<div style="margin-top:10px;color:#ffb454;font-size:13px">核对产品名后再生成报价单（不扣款），扣款需二次确认。</div>';
+    }
+    function paint() {
+      $('shSub').innerHTML = sub();
+      Array.prototype.forEach.call($('shSub').querySelectorAll('button[data-alt]'), function (b) {
+        b.addEventListener('click', function () {
+          var x = state.pickAlts[Number(b.getAttribute('data-alt'))];
+          if (!x) return;
+          state.ask.infoId = x.infoId;
+          state.ask.title = x.title;
+          state.ask.price = x.price;
+          state.ask.salePrice = x.price;
+          state.ask.alias = x.alias;
+          paint();
+        });
+      });
+    }
+    state.ask.title = d.pick.title;
+    state.ask.price = d.pick.price;
+    state.ask.salePrice = d.pick.salePrice;
+    state.ask.alias = d.pick.alias;
+    $('shCount').value = o.count;
+    $('shPhone').value = o.phone;
+    $('shName').value = o.name;
+    localStorage.setItem(LS_PHONE, o.phone);
+    if (o.name) localStorage.setItem(LS_NAME, o.name);
+    state.askName = o.name || '';
+    $('shPlan').innerHTML = '';
+    setMsg($('shMsg'), '', '');
+    $('sheet').setAttribute('data-gi', '');
+    paint();
+    $('sheet').classList.add('on');
+  }
+
+  // ---------- 绑定 ----------
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+    t.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (x) { x.classList.remove('on'); });
+      t.classList.add('on');
+      var name = t.getAttribute('data-tab');
+      $('panel-best').classList.toggle('on', name === 'best');
+      $('panel-order').classList.toggle('on', name === 'order');
+    });
+  });
+
+  Array.prototype.forEach.call($('segTree').querySelectorAll('button'), function (b) {
+    b.addEventListener('click', function () {
+      Array.prototype.forEach.call($('segTree').querySelectorAll('button'), function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      state.tree = b.getAttribute('data-t');
+      syncCurSel();
+    });
+  });
+
+  $('btnBest').addEventListener('click', function () {
+    // 手动改条件后不再套用上一句话里的酒店/房型过滤与模型选品结果
+    state.intent = null;
+    state.modelPick = null;
+    state.showAll = false;
+    doBest();
+  });
+  $('btnAdv').addEventListener('click', function () {
+    var open = $('adv').style.display === 'none';
+    $('adv').style.display = open ? 'block' : 'none';
+    this.textContent = open ? '收起手动调整 ▴' : '手动调整日期 / 雪场 / 类型 ▾';
+    if (open) syncCurSel();
+  });
+  $('date').addEventListener('change', syncCurSel);
+  $('keyword').addEventListener('input', syncCurSel);
+  $('btnAsk').addEventListener('click', doAsk);
+  $('btnAskOrder').addEventListener('click', doAskOrder);
+  // 大段文本: 回车用于换行, 只有 Ctrl/⌘+回车 才触发查价, 避免粘贴多行时误触
+  $('ask').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doAsk(); }
+  });
+  $('btnPlan').addEventListener('click', makePlan);
+  $('btnDetail').addEventListener('click', doDetail);
+  $('btnLogin').addEventListener('click', login);
+  $('btnSetting').addEventListener('click', function () { logout(); });
+  $('sheet').addEventListener('click', function (e) { if (e.target === $('sheet')) closeSheet(); });
+  $('tkInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') login(); });
+
+  $('date').value = defaultDate();
+  syncCurSel();
+
+  if (token()) {
+    api('/accounts').then(function (d) {
+      $('login').style.display = 'none';
+      fillAccounts(d.accounts || []);
+      $('bestMeta').textContent = '已连接 ' + (d.accounts || []).length + ' 个账号，选好日期后点「开始比价」';
+    }).catch(function () { $('login').style.display = 'flex'; });
+  }
+})();
+</script>
+</body>
+</html>

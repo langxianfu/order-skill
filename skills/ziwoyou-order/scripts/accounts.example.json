@@ -1,0 +1,24 @@
+{
+  "$comment": "自我游分销商账号配置。复制本文件为 accounts.json 后填入真实凭据; accounts.json 已在 .gitignore 中, 切勿提交。mode: b2b=账号密码录单(后台可管理, 推荐), fan=openId 粉丝下单(需另配 openId 字段)。views 可选, 记录常用视图别名(如 \"wlhxc\": \"日场\")。domain 填分销商站点主机名(不含协议)。parentCustId/orderCustId/userId 登录后台后在接口或页面源码中可得。",
+  "account-a": {
+    "domain": "your-reseller.example.com",
+    "parentCustId": 0,
+    "orderCustId": 0,
+    "userId": "your-login-name",
+    "password": "your-password",
+    "mode": "b2b",
+    "phone": "13800000000",
+    "views": {
+      "wlhxc": "日场"
+    }
+  },
+  "account-b": {
+    "domain": "another-reseller.example.com",
+    "parentCustId": 0,
+    "orderCustId": 0,
+    "userId": "your-login-name-2",
+    "password": "your-password-2",
+    "mode": "b2b",
+    "phone": "13900000000"
+  }
+}
