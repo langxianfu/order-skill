@@ -38,7 +38,7 @@ curl -s -H "Authorization: Bearer $ZWY_TOKEN" "$ZWY_BASE/best?date=2026-12-19&ke
 | /accounts | GET | 无 | 列出可用分销商账号别名 |
 | /best | GET | date(必填,YYYY-MM-DD), keyword, pkey, tree(0门票/1住滑/any) | 多账号同款比价, 结果缓存约 5 分钟 |
 | /order/plan | POST | JSON: date, count, keyword 或 infoId 或 pick, tree, maxPrice | 生成报价单(不扣款), 返回 plan 文件名 |
-| /order/execute | POST | JSON: plan, date, count, maxMoney, confirm="CONFIRM", phone?, name? | 真实下单扣款, 需服务端开启 ZWY_ENABLE_ORDER=1 |
+| /order/execute | POST | JSON: plan, date, count, maxMoney, confirm="CONFIRM", phone?, name?, accounts?(逗号分隔, 失败后按账号重试) | 真实下单扣款, 需服务端开启 ZWY_ENABLE_ORDER=1 |
 | /order/detail | GET | orderId, account | 查订单状态/票码 |
 | /order/search | GET | key(姓名/手机/订单号/票码) 或 date, account 可选 | 搜订单 |
 
