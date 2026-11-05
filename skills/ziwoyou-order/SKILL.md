@@ -1,6 +1,6 @@
 ---
 name: ziwoyou-order
-description: 自我游(zowoyou)分销商系统雪票/门票/住滑的价格查询、多账号比价与自动下单。当用户问"XX雪场某天多少钱""一天/两天票价格""哪家最便宜""帮我比价""查一下最低价"，或要下单雪票/门票/预售票/住滑套餐、查询与管理自我游订单、查票码、转发微信里的订票需求时使用。支持远程 HTTPS 模式(手机端可用)与本地 CLI 模式、B2B 录单、批量下单、比价后自动降级下单。不用于非自我游体系的平台。
+description: 自我游(zowoyou)分销商系统雪票/门票/住滑的价格查询、多账号比价与自动下单。当用户问"XX雪场某天多少钱""一天/两天票价格""哪家最便宜""帮我比价""查一下最低价"，或要下单雪票/门票/预售票/住滑套餐、查询与管理自我游订单、查票码、转发微信里的订票需求时使用。支持远程 HTTPS 模式(手机端可用)与本地 CLI 模式、B2B 录单、批量下单、比价后自动降级下单，下单失败后可人工选择账号重试。不用于非自我游体系的平台。
 ---
 
 # 自我游下单
@@ -57,6 +57,7 @@ node scripts/zwy.js order    --account=<别名> --infoId=49383899 --date=2026-11
 node scripts/zwy.js detail   --account=<别名> --orderId=1219953828     # 查状态/票码
 node scripts/zwy.js search   --account=<别名> --key=王磊                # 按姓名/手机/订单号/票码搜
 node scripts/zwy.js best     --date=2026-12-19 [--keyword=万龙] [--tree=0|1|any]   # 多账号同款比价
+node scripts/zwy.js orderbest --execute --plan=<报价单> --date=... --count=N --max-money=<上限> [--accounts=a,b]  # 确认后按最低价降级下单; accounts 为人工指定账号
 ```
 
 `--tree` 区分产品树: 0=门票/雪票(默认), 1=酒店/住滑。住滑产品单位是「套」(通常含 1 晚住宿 + N 人雪票), 下单流程与票类一致, 数量按套数算, 房型/含人数写在产品标题里。
@@ -69,7 +70,7 @@ node scripts/zwy.js best     --date=2026-12-19 [--keyword=万龙] [--tree=0|1|an
 2. **定位产品**: 若用户给的是产品关键词而非 infoId, 先比价/列产品得到候选, 让用户确认或自动匹配唯一项。
 3. **确认后再下单**: 下单会把真实授信扣款。列出"账号/套餐/日期/数量/单价合计", **等用户确认后**再执行(除非用户已在指令里明确说"直接下")。
 4. **执行**: 远程模式走 plan → execute 两阶段; 本地模式直接 order/orderbest。
-5. **汇报**: 每笔给出 orderId、状态、票码; 票码缺失时提示稍后用 detail 复查。
+5. **汇报**: 每笔给出 orderId、状态、票码; 票码缺失时提示稍后用 detail 复查。自动降级失败时, 把「可选账号」清单交给用户选择, 用户选定后再用 accounts 指定账号重试。
 
 ## 比价口径(best / /best)
 
@@ -102,9 +103,41 @@ curl -s -X POST -H "Authorization: Bearer $ZWY_TOKEN" -H "content-type: applicat
 - 下单前实时复核价格; 若当前价超出单均上限(maxMoney/count)则跳过该账号;
 - **下单成功但支付失败, 或提交后取不到 orderId → 立即停止降级并输出 orderId/渠道单号**, 换账号重下会重复占单, 需人工处理;
 - 报价单有效期 30 分钟, 日期/数量与请求不一致会被拒绝;
-- 最坏总价(候选最高单价 × 数量)超过 maxMoney 直接拒绝执行。
+- 最坏总价(候选最高单价 × 数量)超过 maxMoney 直接拒绝执行;
+- 部分失败后可用 `accounts`(或 `account`)只重试指定账号; 此时数量可以小于报价单数量;
+- 每次执行结果会写回报价单 `runs`, 重试数量不能超过"报价单数量 - 已成功单数", 避免重复扣款。
 
 phone 会覆盖所有候选账号的联系电话; 候选账号自身没配 phone 且未传 phone 会被跳过, 跨账号降级前先确认手机号。
+
+## 下单失败后人工选账号重试(accounts)
+
+自动降级失败后(未完成单数 > 0 且没有 halted), 结果是可重试的: 脚本/接口会返回「可选账号」清单(每个候选账号的价格/infoId/失败原因), 此时由用户决定用哪个账号下单, **不要自己再随便挑一个账号重下**。
+
+远程模式(`/order/execute`):
+
+```bash
+# accounts: 只在这些账号内按给定顺序降级; 单个账号也可以直接传 account
+curl -s -X POST -H "Authorization: Bearer $ZWY_TOKEN" -H "content-type: application/json" \
+  -d '{"plan":"<报价单文件名>","date":"2026-12-19","count":1,"maxMoney":300,"confirm":"CONFIRM","phone":"13800000000","accounts":"leku"}' \
+  "$ZWY_BASE/order/execute"
+```
+
+本地模式(orderbest):
+
+```bash
+node scripts/zwy.js orderbest --execute --plan=.state/plan-2026-12-19-xxxx.json \
+  --date=2026-12-19 --count=1 --max-money=300 --accounts=leku
+node scripts/zwy.js orderbest --execute --plan=... --date=... --count=1 --max-money=400 --accounts=leku,xiexiewang
+```
+
+- 对话流程: 执行失败 → 把「可选账号」清单原样给用户, 让用户选一个账号(必要时补手机号) → 用户确认后再执行 accounts/`--accounts`; 用户没选之前不要重试。
+- `accounts` 只接受报价单里的候选别名, 传了不存在的别名会报错并列出可选账号。
+- 指定账号时数量可以小于报价单数量(用于只补剩余单数); 未指定时仍要求与报价单数量一致。
+- 每次执行结果写回报价单 `runs`, 重试数量不能超过"报价单数量 - 已成功单数"; 想重下整批请重新生成报价单。
+- 已经成功的账号仍可再次用于剩余单; 库存不足/不可售的账号也可以重试(可能已恢复), 但要在请求里显式选它。
+- **出现 halted(支付失败/未取到 orderId)时禁止换账号重试**: 订单可能已占单或已扣款, 先用 detail 核对状态, 人工处理后再决定。
+
+接口返回在失败时包含 `canRetry`、`remaining`、`failed`、`candidates`(每账号的 status/reason/retryable), 供前端或助手展示可选账号。
 
 ## 账号配置
 

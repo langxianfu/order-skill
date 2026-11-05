@@ -431,7 +431,13 @@ async function handleExecute(req, res) {
   if (!/^plan-\d{4}-\d{2}-\d{2}-\d+\.json$/.test(plan)) return fail(res, 400, 'plan 必须是本服务生成的报价单文件名');
   if (!fs.existsSync(path.join(STATE, plan))) return fail(res, 404, `报价单不存在或已清理: ${plan}`);
 
+  // 人工选账号: 下单失败后可用 accounts 只重试指定账号, 多个别名按给定顺序降级
+  const rawAccounts = Array.isArray(b.accounts) ? b.accounts : String(b.accounts || b.account || '').split(',');
+  const accounts = [...new Set(rawAccounts.map((s) => String(s).trim()).filter(Boolean))];
+  if (accounts.length && !accounts.every((a) => /^[A-Za-z0-9_-]{1,32}$/.test(a))) return fail(res, 400, 'accounts 只能填账号别名, 多个用逗号分隔');
+
   const args = ['orderbest', '--execute', `--plan=${plan}`, `--date=${date}`, `--count=${count}`, `--max-money=${maxMoney}`, '--json'];
+  if (accounts.length) args.push(`--accounts=${accounts.join(',')}`);
   if (b.phone) args.push(`--phone=${String(b.phone).replace(/[^\d]/g, '').slice(0, 11)}`);
   if (b.name) args.push(`--name=${String(b.name).slice(0, 20)}`);
 

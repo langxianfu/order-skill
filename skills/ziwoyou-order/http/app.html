@@ -507,26 +507,66 @@
     if (!(max > 0)) { setMsg($('shMsg'), 'err', '金额上限必须大于 0'); return; }
     if (max + 0.001 < p.worst) { setMsg($('shMsg'), 'err', '上限低于最坏总价 ' + money(p.worst) + '，无法执行'); return; }
     var planFile = String(p.planPath).split('/').pop();
-    setMsg($('shMsg'), 'info', '执行中，请勿关闭页面…');
     var btn = $('btnExec');
-    btn.disabled = true;
-    api('/order/execute', { method: 'POST', body: {
+    if (btn) btn.disabled = true;
+    runExecute({
       plan: planFile, date: p.date, count: p.count, maxMoney: max,
       confirm: 'CONFIRM', phone: $('shPhone').value.trim() || undefined,
       name: $('shName').value.trim() || undefined
-    } }).then(function (d) {
-      var items = (d.results || []).map(function (r) {
-        return '<div class="kv"><span>' + esc(r.name || '') + '</span><b>' +
-          (r.ok ? (r.orderId ? '订单 ' + esc(r.orderId) : '成功') : '失败') + '</b></div>';
+    }, planFile, p, max);
+  }
+
+  // 执行失败后可按账号重试: 只把用户选中的账号传给后端, 不在其它账号间降级
+  function runExecute(body, planFile, p, max) {
+    setMsg($('shMsg'), 'info', '执行中，请勿关闭页面…');
+    api('/order/execute', { method: 'POST', body: body })
+      .then(function (d) { renderExecute(d, planFile, p, max); })
+      .catch(function (e) {
+        setMsg($('shMsg'), 'err', e.message);
+        var b = $('btnExec'); if (b) b.disabled = false;
+      });
+  }
+
+  function renderExecute(d, planFile, p, max) {
+    var items = (d.results || []).map(function (r) {
+      return '<div class="kv"><span>' + esc(r.name || '') + '</span><b>' +
+        (r.ok ? (r.orderId ? '订单 ' + esc(r.orderId) : '成功') : '失败') + '</b></div>';
+    }).join('');
+    var html = items + '<div class="kv"><span>合计</span><b>' + money(d.total) + '</b></div>';
+    var blocked = Object.keys(d.blocked || {});
+    if (blocked.length) html += '<div class="meta">跳过的账号：' + blocked.map(function (k) {
+      return esc(k) + '（' + esc(d.blocked[k]) + '）'; }).join('、') + '</div>';
+
+    var retryList = (d.candidates || []).filter(function (c) { return c.retryable !== false; });
+    if (d.canRetry && d.remaining > 0 && retryList.length) {
+      var opts = retryList.map(function (c) {
+        var st = c.status === 'failed' ? '（' + (c.reason || '失败') + '）'
+          : c.status === 'success' ? '（本单已成功）' : '（未尝试）';
+        return '<option value="' + esc(c.alias) + '">' + esc(c.alias) + ' ' + money(c.price) + st + '</option>';
       }).join('');
-      $('shPlan').innerHTML = items + '<div class="kv"><span>合计</span><b>' + money(d.total) + '</b></div>';
-      var blocked = Object.keys(d.blocked || {});
-      if (blocked.length) $('shPlan').innerHTML += '<div class="meta">跳过的账号：' + blocked.map(function (k) {
-        return esc(k) + '（' + esc(d.blocked[k]) + '）'; }).join('、') + '</div>';
-      setMsg($('shMsg'), d.ok ? 'ok' : 'err', d.ok ? '全部下单成功' : '部分或全部失败，明细见上');
-    }).catch(function (e) {
-      setMsg($('shMsg'), 'err', e.message);
-      btn.disabled = false;
+      html += '<div class="field"><label>还有 ' + d.remaining + ' 单未完成，选择账号重试</label>' +
+        '<select id="shRetryAcc">' + opts + '</select></div>' +
+        '<button class="btn danger" id="btnRetry">用所选账号重试 ' + d.remaining + ' 单</button>';
+    }
+    $('shPlan').innerHTML = html;
+
+    var msgs = [];
+    if (d.ok) msgs.push('全部下单成功');
+    else msgs.push('部分或全部失败，明细见上');
+    if (d.halted) msgs.push('存在状态不确定的订单，请先在「订单」里核对，不要换账号重下');
+    else if (d.canRetry && d.remaining > 0) msgs.push('可选择一个账号继续重试，未选之前不会下单');
+    setMsg($('shMsg'), d.ok ? 'ok' : 'err', msgs.join('；'));
+
+    var retry = $('btnRetry');
+    if (retry) retry.addEventListener('click', function () {
+      var alias = $('shRetryAcc').value;
+      if (!alias) return;
+      retry.disabled = true;
+      runExecute({
+        plan: planFile, date: p.date, count: d.remaining, maxMoney: max,
+        confirm: 'CONFIRM', phone: $('shPhone').value.trim() || undefined,
+        name: $('shName').value.trim() || undefined, accounts: alias
+      }, planFile, p, max);
     });
   }
 
@@ -700,6 +740,9 @@
       $('keyword').value = o.keyword;
       applyTree(String(o.tree));
       state.intent = intentTokens(o.intent).length ? o.intent : null;
+      // 只查价格也要记住解析出的游客姓名/手机号, 否则从结果卡片点「下单」时面板会是空的
+      if (o.name) { localStorage.setItem(LS_NAME, o.name); state.askName = o.name; }
+      if (o.phone) localStorage.setItem(LS_PHONE, o.phone);
       state.showAll = false;
       state.modelPick = null;
       var it = o.intent || {};

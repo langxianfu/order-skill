@@ -2,16 +2,17 @@
 // 自我游(zowoyou)多账号下单 CLI。无任何依赖,Node 18+。
 //
 // 用法:
-//   node zwy.js login    --account=account-a                          登录并缓存 token
-//   node zwy.js views    --account=account-a                          列出该账号的产品视图
-//   node zwy.js products --account=account-a --view=wlhxc             列出某视图下的产品(infoId/价格)
-//   node zwy.js order    --account=account-a --infoId=49383899 --date=2026-11-30 [--count=5] [--name=张三] [--phone=...] [--dry]
-//   node zwy.js detail   --account=account-a --orderId=1219953828     查订单详情(状态/票码)
-//   node zwy.js search   --account=account-a --key=王磊                按姓名/手机号/订单号/票码查订单
-//   node zwy.js orders   [--account=account-a] [--key=梁爽] [--date=2026-11-11] [--json]   按姓名/日期跨账号查订单
+//   node zwy.js login    --account=dingdang                          登录并缓存 token
+//   node zwy.js views    --account=dingdang                          列出该账号的产品视图
+//   node zwy.js products --account=dingdang --view=wlhxc             列出某视图下的产品(infoId/价格)
+//   node zwy.js order    --account=dingdang --infoId=49383899 --date=2026-11-30 [--count=5] [--name=张三] [--phone=...] [--dry]
+//   node zwy.js detail   --account=dingdang --orderId=1219953828     查订单详情(状态/票码)
+//   node zwy.js search   --account=dingdang --key=王磊                按姓名/手机号/订单号/票码查订单
+//   node zwy.js orders   [--account=dingdang] [--key=梁爽] [--date=2026-11-11] [--json]   按姓名/日期跨账号查订单
 //   node zwy.js best     --date=2026-12-19 [--keyword=万龙] [--tree=0|1|any]   三账号同款比价
 //   node zwy.js orderbest --date=... [--keyword=...] [--count=N] [--pick=N|--infoId=...]   比价并生成报价单
-//   node zwy.js orderbest --execute --plan=<报价单> --date=... --count=N --max-money=<上限>   人工确认后按最低价自动降级下单
+//   node zwy.js orderbest --execute --plan=<报价单> --date=... --count=N --max-money=<上限> [--accounts=a,b]   人工确认后按最低价自动降级下单;
+//            --accounts 表示人工指定账号(逗号分隔, 按给定顺序降级), 下单失败后可只挑某个账号重试
 //
 // 模式: 账号配置 mode=b2b 时走账号密码录单(orderSource=1, B2B 图标);
 //       mode=fan 时走 openId 静默登录的粉丝下单(orderSource=19, 手机图标)。
@@ -548,11 +549,27 @@ async function cmdOrderBest(args) {
     const plan = JSON.parse(fs.readFileSync(abs, 'utf8'));
     if (Date.now() - plan.createdAt > 30 * 60 * 1000) die('报价单已超过 30 分钟, 价格可能变动, 请重新 --plan');
     if (plan.date !== date) die(`报价单日期 ${plan.date} 与 --date=${date} 不一致`);
-    if (plan.count !== count) die(`报价单数量 ${plan.count} 与 --count=${count} 不一致`);
     if (!plan.candidates.length) die('报价单没有候选账号');
+    // 人工选账号: --accounts=别名1,别名2(或 --account=别名) 只在这些账号内按给定顺序尝试;
+    // 部分失败后重试时数量可以小于报价单数量, 因此只有人工选账号时才放宽 count 校验
+    const picked = String(args.accounts || args.account || '').split(',').map((s) => s.trim()).filter(Boolean);
+    let candidates = plan.candidates;
+    if (picked.length) {
+      const byAlias = new Map(plan.candidates.map((c) => [c.alias, c]));
+      const unknown = picked.filter((a) => !byAlias.has(a));
+      if (unknown.length) die(`账号 ${unknown.join(', ')} 不在报价单候选里, 可选: ${plan.candidates.map((c) => c.alias).join(', ')}`);
+      candidates = picked.filter((a, i) => picked.indexOf(a) === i).map((a) => byAlias.get(a));
+    }
+    if (count > plan.count) die(`本次数量 ${count} 超过报价单数量 ${plan.count}`);
+    // 报价单记录过执行结果: 重试只能用 --accounts 指定账号, 且数量不能超过剩余未完成单数, 防止重复扣款
+    const priorSuccess = Array.isArray(plan.runs) ? plan.runs.reduce((s, r) => s + Number(r.success || 0), 0) : 0;
+    const priorRemaining = Math.max(0, plan.count - priorSuccess);
+    if (picked.length && count > priorRemaining) die(`本次数量 ${count} 超过剩余未完成 ${priorRemaining} 单(该报价单此前已成功 ${priorSuccess} 单)`);
+    if (!picked.length && priorSuccess > 0) die(`报价单此前已成功 ${priorSuccess} 单, 重试请用 --accounts=<账号> 指定账号并把 --count 填剩余单数`);
+    if (!picked.length && plan.count !== count) die(`报价单数量 ${plan.count} 与 --count=${count} 不一致(部分失败重试时请加 --accounts=<账号>)`);
     const perOrderCap = maxMoney / count;
-    const worst = Math.max(...plan.candidates.map((c) => c.price)) * count;
-    console.log(`[执行] 报价单=${abs}\n  产品=${plan.groupTitle}\n  数量=${count}  候选=${plan.candidates.length} 个账号  最坏总价=¥${worst.toFixed(2)}  上限=¥${maxMoney}`);
+    const worst = Math.max(...candidates.map((c) => c.price)) * count;
+    console.log(`[执行] 报价单=${abs}\n  产品=${plan.groupTitle}\n  数量=${count}  候选=${candidates.length} 个账号${picked.length ? `(人工指定: ${candidates.map((c) => c.alias).join(' → ')})` : ''}  最坏总价=¥${worst.toFixed(2)}  上限=¥${maxMoney}`);
     if (worst > maxMoney + 0.001) die(`最坏总价 ¥${worst.toFixed(2)} 超过 --max-money ¥${maxMoney}, 拒绝执行`);
     console.log('  已通过人工确认的报价单与金额上限校验, 开始自动降级下单\n');
 
@@ -560,36 +577,54 @@ async function cmdOrderBest(args) {
     const ctxCache = {};
     const blocked = {};
     const results = [];
+    const failed = [];
     let done = 0;
     let halted = '';
 
     while (done < count) {
       let placed = false;
-      for (const cand of plan.candidates) {
+      for (const cand of candidates) {
         if (blocked[cand.alias]) continue;
         const acc = { alias: cand.alias, ...all[cand.alias] };
         const phone = args.phone || acc.phone;
-        if (!phone) { console.log(`[跳过] ${cand.alias}: 无手机号`); blocked[cand.alias] = '无手机号'; continue; }
+        if (!phone) {
+          console.log(`[跳过] ${cand.alias}: 无手机号`);
+          blocked[cand.alias] = '无手机号';
+          failed.push({ alias: cand.alias, reason: '无手机号', phase: 'precheck', retryable: true });
+          continue;
+        }
         const ctx = ctxCache[cand.alias] || (ctxCache[cand.alias] = { token: await login(acc) });
         const name = args.name || randomName();
         console.log(`\n[第${done + 1}/${count}单] 尝试 ${cand.alias} ¥${cand.price} infoId=${cand.infoId} 游客=${name}`);
 
         const chk = await reserveCheck(acc, ctx, cand.infoId, date, 1);
-        if (!chk.ok) { console.log(`  ✗ 库存/售卖校验失败: ${chk.reason} → 降级下一账号`); blocked[cand.alias] = chk.reason; continue; }
+        if (!chk.ok) {
+          console.log(`  ✗ 库存/售卖校验失败: ${chk.reason} → 降级下一账号`);
+          blocked[cand.alias] = chk.reason;
+          failed.push({ alias: cand.alias, name, reason: chk.reason, phase: 'check', retryable: true });
+          continue;
+        }
         if (chk.price > perOrderCap + 0.001) {
           console.log(`  ✗ 当前价 ¥${chk.price} 超出单均上限 ¥${perOrderCap.toFixed(2)} → 跳过该账号`);
           blocked[cand.alias] = `价格¥${chk.price}超限`;
+          failed.push({ alias: cand.alias, name, reason: `价格¥${chk.price}超限`, phase: 'check', retryable: true });
           continue;
         }
         if (Math.abs(chk.price - cand.price) > 0.011) console.log(`  ! 价格变动: ¥${cand.price} → ¥${chk.price}(仍在授权范围内)`);
 
         const ord = await placeOrder(acc, ctx, cand.infoId, date, name, phone);
-        if (!ord.ok) { console.log(`  ✗ 下单失败: ${ord.reason} → 降级下一账号`); blocked[cand.alias] = ord.reason; continue; }
+        if (!ord.ok) {
+          console.log(`  ✗ 下单失败: ${ord.reason} → 降级下一账号`);
+          blocked[cand.alias] = ord.reason;
+          failed.push({ alias: cand.alias, name, reason: ord.reason, phase: 'place', retryable: true });
+          continue;
+        }
         let orderId = ord.orderId;
         if (!orderId) { await sleep(800); orderId = await findOrderIdBySource(acc, ctx, ord.orderSourceId); }
         if (!orderId) {
           console.log(`  ✗ 已提交但未取到 orderId(渠道单号 ${ord.orderSourceId}) → 停止降级, 请人工核对`);
           results.push({ ok: false, alias: cand.alias, name, reason: '未取到orderId, 可能已占单' });
+          failed.push({ alias: cand.alias, name, reason: '未取到orderId, 可能已占单', phase: 'place', retryable: false, orderSourceId: ord.orderSourceId });
           halted = `渠道单号 ${ord.orderSourceId} 未取到 orderId, 可能已占单`;
           break;
         }
@@ -599,6 +634,7 @@ async function cmdOrderBest(args) {
         if (!pay.ok) {
           console.log(`  ✗ 支付失败: ${pay.reason} → 停止降级(订单 ${orderId} 已创建, 换账号重下会重复占单, 需人工处理)`);
           results.push({ ok: false, alias: cand.alias, name, orderId, reason: pay.reason });
+          failed.push({ alias: cand.alias, name, orderId, reason: pay.reason, phase: 'pay', retryable: false });
           halted = `订单 ${orderId} 支付失败: ${pay.reason}`;
           break;
         }
@@ -614,21 +650,73 @@ async function cmdOrderBest(args) {
         break;
       }
       if (halted) break;
-      if (!placed && plan.candidates.every((c) => blocked[c.alias])) {
+      if (!placed && candidates.every((c) => blocked[c.alias])) {
         console.log('\n[中止] 候选账号全部失败, 剩余单未完成');
         break;
       }
     }
 
     const okList = results.filter((r) => r.ok);
-    console.log(`\n[汇总] 目标 ${count} 单, 成功 ${okList.length}, 未完成 ${count - okList.length}`);
+    const remaining = count - okList.length;
+    const canRetry = remaining > 0 && !halted;
+    const usedAliases = new Set(okList.map((r) => r.alias));
+    const failedByAlias = new Map(failed.map((f) => [f.alias, f]));
+    const candidateInfo = plan.candidates.map((c) => {
+      const f = failedByAlias.get(c.alias);
+      return {
+        alias: c.alias,
+        price: c.price,
+        infoId: c.infoId,
+        selected: candidates.some((x) => x.alias === c.alias),
+        status: usedAliases.has(c.alias) ? 'success' : f ? 'failed' : 'untried',
+        reason: f ? f.reason : '',
+        retryable: f ? f.retryable : true,
+      };
+    });
+
+    console.log(`\n[汇总] 目标 ${count} 单, 成功 ${okList.length}, 未完成 ${remaining}`);
     results.forEach((r, i) => console.log(`  #${i + 1} ${r.ok ? 'OK' : 'FAIL'} ${r.alias} ${r.name} orderId=${r.orderId || '-'} ${r.code ? '票码=' + r.code : ''}${r.reason ? '  原因=' + r.reason : ''}`));
     if (okList.length) console.log(`  合计 ¥${okList.reduce((s, r) => s + Number(r.money || 0), 0).toFixed(2)}  用到的账号: ${[...new Set(okList.map((r) => r.alias))].join(', ')}`);
     if (Object.keys(blocked).length) console.log(`  被跳过/失败的账号: ${Object.entries(blocked).map(([k, v]) => `${k}(${String(v).slice(0, 40)})`).join('; ')}`);
     if (halted) console.log(`  ⚠ 已停止降级: ${halted}`);
+
+    // 下单失败后的人工选账号入口: 列出所有候选账号与失败原因, 给出可直接复制的重试命令
+    if (remaining > 0 && !halted) {
+      console.log(`\n[可选账号] 还有 ${remaining} 单未完成, 可指定账号重试:`);
+      candidateInfo.forEach((c, i) => {
+        const st = c.status === 'success' ? '本单已成功' : c.status === 'failed' ? `失败: ${String(c.reason).slice(0, 40)}` : '未尝试';
+        console.log(`  ${i + 1}. ${c.alias.padEnd(12)} ¥${String(c.price).padEnd(8)} infoId=${c.infoId}  ${st}${c.retryable ? '' : '  [禁止重试]'}`);
+      });
+      console.log(`  重试(把 <账号> 换成一个或多个候选账号, 逗号分隔按顺序降级):`);
+      console.log(`  node zwy.js orderbest --execute --plan="${abs}" --date=${date} --count=${remaining} --max-money=<上限> --accounts=<账号>`);
+    }
+    if (halted) console.log('  ⚠ 存在订单状态不确定的单, 请先用 detail 核对, 不要直接换账号重下, 避免重复占单。');
+
+    // 记录本次执行, 作为后续重试的剩余单数与防重复扣款依据
+    plan.runs = Array.isArray(plan.runs) ? plan.runs : [];
+    plan.runs.push({ at: Date.now(), count, success: okList.length, remaining, accounts: candidates.map((c) => c.alias), halted: halted || null });
+    try {
+      fs.writeFileSync(abs, JSON.stringify(plan, null, 2));
+    } catch (e) {
+      console.log(`  ! 未能把本次执行结果记回报价单: ${e.message}(下次重试可能重复扣款, 请核对订单后再重下)`);
+    }
+
     if (args.json) {
       const total = okList.reduce((s, r) => s + Number(r.money || 0), 0);
-      process.stdout.write(JSON.stringify({ ok: okList.length === count, stage: 'execute', count, success: okList.length, total: Number(total.toFixed(2)), results, blocked, halted: halted || null }) + '\n');
+      process.stdout.write(JSON.stringify({
+        ok: okList.length === count,
+        stage: 'execute',
+        count,
+        success: okList.length,
+        remaining,
+        canRetry,
+        total: Number(total.toFixed(2)),
+        results,
+        blocked,
+        failed,
+        candidates: candidateInfo,
+        halted: halted || null,
+      }) + '\n');
     }
     if (okList.length < count) process.exitCode = 2;
     return;

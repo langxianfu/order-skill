@@ -59,17 +59,19 @@ const TOOLS = [
   },
   {
     name: 'zwy_order_execute',
-    description: '执行报价单真实下单并扣授信, 失败自动降级到次低价账号。必须先在服务端开启 ZWY_ENABLE_ORDER=1, 且 confirm 传 CONFIRM。',
+    description: '执行报价单真实下单并扣授信, 失败自动降级到次低价账号。必须先在服务端开启 ZWY_ENABLE_ORDER=1, 且 confirm 传 CONFIRM。下单失败后可用 accounts 指定账号重试(不会在未指定的账号间降级)。',
     inputSchema: {
       type: 'object',
       properties: {
         plan: { type: 'string', description: 'zwy_order_plan 返回的报价单文件名' },
         date: { type: 'string', description: '与报价单一致的日期' },
-        count: { type: 'integer', minimum: 1, maximum: 20, description: '与报价单一致的数量' },
+        count: { type: 'integer', minimum: 1, maximum: 20, description: '与报价单一致的数量(部分失败重试时填剩余单数)' },
         maxMoney: { type: 'number', description: '本次总金额上限, 必须大于 0' },
         confirm: { type: 'string', enum: ['CONFIRM'], description: '人工确认标记' },
         phone: { type: 'string', description: '游客手机号, 未配置手机号的账号必需' },
         name: { type: 'string', description: '游客姓名' },
+        accounts: { type: 'string', description: '仅用这些账号下单/重试, 别名逗号分隔如 leku,xiexiewang, 按给定顺序降级' },
+        account: { type: 'string', description: '只用一个账号下单/重试, 等价于 accounts 传单个别名' },
       },
       required: ['plan', 'date', 'count', 'maxMoney', 'confirm'],
     },
@@ -131,7 +133,7 @@ async function runTool(name, a) {
   }
   if (name === 'zwy_order_execute') {
     return await callApi('/order/execute', 'POST', {
-      plan: a.plan, date: a.date, count: a.count, maxMoney: a.maxMoney, confirm: a.confirm, phone: a.phone, name: a.name,
+      plan: a.plan, date: a.date, count: a.count, maxMoney: a.maxMoney, confirm: a.confirm, phone: a.phone, name: a.name, accounts: a.accounts, account: a.account,
     });
   }
   if (name === 'zwy_order_detail') {
